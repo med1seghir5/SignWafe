@@ -1,74 +1,83 @@
 import mongoose from "mongoose";
-
 const { Schema } = mongoose;
 
-const UsersSchema = new Schema({
-    Email: {
-        type: String,
-        required: [true, "Please enter a Email"],
-        unique: true
-    },
-    Username: {
-        type: String,
-        required: [true, "Please enter a Username"],
-        unique: true
-    },
-    Password: {
-        type: String,
-        required: true,
-        minlength: [5, "Password contains more than 5 characters"],
-    }
-})
-
-export const Users = mongoose.model("Users", UsersSchema)
-
-const ProductSchema = new Schema({
-    category: {
-        type: String,
-        required: [true, "Category is required"],
-        enum: ["Medicament", "Medical Equipment", "Other"]
-    },
-    name: {
-        type: String,
-        required: [true, "Product name is required"],
-        trim: true
-    },
-    AriDate: {
-        type: Date,
-        default: Date.now,
-        required: true
-    },
-    ExpDate: {
-        type: Date,
-        required: [true, "Expiration date is required"],
-        validate: {
-            validator: function(v) {
-                if (typeof v === 'string' && v.includes('/')) {
-                    const [day, month, year] = v.split('/');
-                    v = new Date(`${year}-${month}-${day}`);
-                }
-                return v > new Date();
-            },
-            message: props => 
-                `Expiration date (${props.value}) must be in the future and in DD/MM/YYYY format`
-        }
-    },
-    Quant: {
-        type: Number,
-        default: 0,
-        min: [0, "Quantity can't be negative"]
-    },
-    OnePrice: {
-        type: Number,
-        required: [true, "Price is required"],
-        min: [0.01, "Price must be positive"]
-    },
-    user: {
-        type: mongoose.Schema.Types.ObjectId,
-        ref: 'Users',
-        required: true,
-        immutable: true
-    }
+const userSchema = new Schema({
+  Email: {
+    type: String,
+    required: [true, "Please enter an email"],
+    unique: true,
+    lowercase: true,   
+    trim: true,  
+    match: [/^\S+@\S+\.\S+$/, "Please enter a valid email address"]
+  },
+  Username: {
+    type: String,
+    required: [true, "Please enter a username"],
+    unique: true,
+    trim: true,
+    minlength: [3, "Username must be at least 3 characters long"]
+  },
+  Password: {
+    type: String,
+    required: [true, "Please enter a password"],
+    minlength: [5, "Password must be at least 5 characters long"]
+  },
+  Role: {
+    type: String,
+    enum: ['admin', 'user'],
+    default: 'admin'
+  }
 }, { timestamps: true });
 
-export const Product = mongoose.model('ProductSchema', ProductSchema);
+export const User = mongoose.model("User", userSchema);
+
+const courseSchema = new Schema({
+  level: {
+    type: String,
+    required: [true, "Please enter a course level"],
+    unique: true,
+    min: [1, "Level must be at least 1"]
+  },
+  Title: {
+    type: String,
+    required: [true, "Please enter a title"],
+    trim: true
+  },
+  Description: {
+    type: String,
+    required: [true, "Please enter a description"],
+    trim: true
+  },
+  Content: {
+    type: String,
+    required: [true, "Please enter the number of lessons"]
+  }
+}, { timestamps: true });
+
+export const Course = mongoose.model("Course", courseSchema);
+
+const progressSchema = new Schema({
+  user: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User',
+    required: true
+  },
+  course: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Course',
+    required: true
+  },
+  lessonIndex: {
+    type: Number,
+    default: 0,
+    min: [0, "Lesson index cannot be negative"]
+  },
+  quizCompleted: {
+    type: Boolean,
+    default: false
+  }
+}, { timestamps: true });
+
+progressSchema.index({ user: 1, course: 1 }, { unique: true });
+
+export const Progress = mongoose.model("Progress", progressSchema);

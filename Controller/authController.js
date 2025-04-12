@@ -1,15 +1,17 @@
 import jwt from 'jsonwebtoken';
 import bcrypt from 'bcrypt';
-import { Users } from '../Schema/schema.js';
+import { User } from '../Schema/schema.js';
 import dotenv from 'dotenv';
 
 dotenv.config();
 
 export const Register = async (req, res) => {
   const { Email, Username, Password, ConfirmPassword } = req.body;
+  console.log(req.body);
+  
   
   try {
-    const existUser = await Users.findOne({ 
+    const existUser = await User.findOne({ 
       $or: [
         { Email },
         { Username }
@@ -29,15 +31,19 @@ export const Register = async (req, res) => {
         message: "Passwords do not match" 
       });
     }
+    console.log("Password:", Password);
     
     const hashedPassword = await bcrypt.hash(Password, 10);
+    console.log(hashedPassword);
+    console.log(Email);
     
-    const user = new Users({
+    const user = new User({
       Email,
       Username,
       Password: hashedPassword
     });
     
+    console.log(user);
     await user.save();
     
     const userResponse = user.toObject();
@@ -61,15 +67,17 @@ export const Register = async (req, res) => {
 
 export const Login = async (req, res) => {
   const { Email, Username, Password } = req.body;
+  console.log(req.body);
   
   try {
-    const user = await Users.findOne({
+    const user = await User.findOne({
       $or: [
         { Email },
         { Username }
       ]
     });
-    
+    console.log("Login attempt with:", { Email, Username });
+    console.log("User ", user);
     if (!user) {
       return res.status(404).json({ 
         success: false,
@@ -85,11 +93,10 @@ export const Login = async (req, res) => {
       });
     }
     
-    // Correction ici : utiliser _id au lieu de id
     const accessToken = jwt.sign(
-      { _id: user._id },
+      { _id: user._id , role: user.Role},
       process.env.SECRET_ACCESS,
-      { expiresIn: "15m" }
+      { expiresIn: "1d" }
     );
     
     const refreshToken = jwt.sign(
@@ -101,26 +108,27 @@ export const Login = async (req, res) => {
     user.refreshToken = refreshToken;
     await user.save();
     
-    const cookieOptions = {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax'
-    };
+    // const cookieOptions = {
+    //   httpOnly: true,
+    //   secure: process.env.NODE_ENV === 'production',
+    //   sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax'
+    // };
     
-    res.cookie("accessToken", accessToken, {
-      ...cookieOptions,
-      maxAge: 15 * 60 * 1000
-    });
+    // res.cookie("accessToken", accessToken, {
+    //   ...cookieOptions,
+    //   maxAge: 15 * 60 * 1000
+    // });
     
-    res.cookie("refreshToken", refreshToken, {
-      ...cookieOptions,
-      maxAge: 7 * 24 * 60 * 60 * 1000
-    });
+    // res.cookie("refreshToken", refreshToken, {
+    //   ...cookieOptions,
+    //   maxAge: 7 * 24 * 60 * 60 * 1000
+    // });
     
     const userResponse = {
       id: user._id,
       Email: user.Email,
-      Username: user.Username
+      Username: user.Username,
+      accessToken:accessToken
     };
     
     return res.json({
@@ -179,6 +187,9 @@ export const refreshToken = async (req, res) => {
   }
   
   try {
+    console.log("Refresh token:", refreshToken);
+    console.log(process.env.SECRET_REFRESH);
+    
     const decoded = jwt.verify(refreshToken, process.env.SECRET_REFRESH);
     
     const user = await Users.findById(decoded.id);
